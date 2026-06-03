@@ -5,3 +5,4 @@ out
 .vercel
 dist
 coverage
+tsconfig.tsbuildinfo
