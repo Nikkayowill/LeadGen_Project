@@ -21,7 +21,7 @@ export default async function DashboardPage() {
     const stats = await getDashboardStats();
     return (
       <div className="space-y-7">
-        <section className="overflow-hidden rounded-3xl border border-sky-300/15 bg-gradient-to-br from-sky-400/20 via-card/90 to-blue-950/70 p-6 shadow-[0_26px_80px_rgba(2,8,23,0.35)] sm:p-8">
+        <section className="overflow-hidden rounded-3xl border border-white/10 bg-card p-6 shadow-[0_18px_44px_rgba(2,8,23,0.22)] sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[1.5fr_0.9fr] lg:items-end">
             <PageHeader
               title="Sales dashboard"
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
                 </Button>
               }
             />
-            <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-5">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/70">Pipeline value</p>
               <p className="mt-3 text-4xl font-semibold tracking-tight text-white">
                 {formatCurrency(stats.potentialRevenue)}
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
                     <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
                     <p className="mt-1 text-xs text-sky-200/55">{card.helper}</p>
                   </div>
-                  <div className="rounded-xl border border-sky-300/15 bg-sky-400/10 p-2 text-sky-200">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-sky-200">
                     <Icon className="h-4 w-4" aria-hidden="true" />
                   </div>
                 </CardHeader>
@@ -67,13 +67,13 @@ export default async function DashboardPage() {
               </Card>
             );
           })}
-          <Card className="border-sky-300/20 bg-sky-400/10">
+          <Card className="border-sky-300/20 bg-sky-400/[0.06]">
             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-sm font-medium text-sky-100">Revenue forecast</CardTitle>
                 <p className="mt-1 text-xs text-sky-200/65">Active pipeline value</p>
               </div>
-              <div className="rounded-xl border border-sky-200/20 bg-sky-300/15 p-2 text-sky-100">
+              <div className="rounded-xl border border-sky-200/20 bg-sky-300/10 p-2 text-sky-100">
                 <DollarSign className="h-4 w-4" aria-hidden="true" />
               </div>
             </CardHeader>

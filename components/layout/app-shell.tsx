@@ -24,11 +24,11 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-transparent">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
           <Link href="/dashboard" className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-300/30 bg-sky-400/15 text-sky-200 shadow-[0_0_28px_rgba(56,189,248,0.18)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-400/10 text-sky-200">
                 <BarChart3 className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className="inline-flex min-h-9 items-center gap-2 rounded-full border border-transparent px-3 text-sm text-muted-foreground transition hover:border-sky-300/20 hover:bg-sky-400/10 hover:text-sky-100"
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-3 text-sm text-muted-foreground transition hover:border-white/10 hover:bg-white/5 hover:text-foreground"
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="whitespace-nowrap">{item.label}</span>
