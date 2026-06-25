@@ -92,7 +92,7 @@ export default async function SettingsPage() {
               ) : (
                 <EmptyState
                   title="No pitch templates"
-                  description="Add templates that can later feed generated AI outreach."
+                  description="Add reusable message templates for common industries and follow-up scenarios."
                 />
               )}
             </CardContent>

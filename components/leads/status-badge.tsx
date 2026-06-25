@@ -12,6 +12,7 @@ const leadStatusVariant: Record<string, "secondary" | "info" | "warning" | "succ
 
 const websiteStatusVariant: Record<string, "secondary" | "info" | "warning" | "success" | "outline"> = {
   "No Website": "warning",
+  "Not listed": "secondary",
   "Outdated Website": "warning",
   "Good Website": "success",
   Unknown: "secondary"

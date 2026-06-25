@@ -2,6 +2,8 @@ import { AlertCircle } from "lucide-react";
 import { DiscoveredLeadsTable } from "@/components/lead-finder/discovered-leads-table";
 import { LeadFinderSummary } from "@/components/lead-finder/lead-finder-summary";
 import { LeadSearchForm } from "@/components/lead-finder/lead-search-form";
+import { RecentDiscoveryRuns } from "@/components/lead-finder/recent-discovery-runs";
+import { SaveDiscoveryRunButton } from "@/components/lead-finder/save-discovery-run-button";
 import { ErrorState } from "@/components/layout/error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/ui/empty-state";
 import type { LeadFinderSearch } from "@/lib/types/discovery";
 import { findLeadsOnline } from "@/services/discovery";
+import { getDiscoveryRuns } from "@/services/discovery-runs";
 
 type LeadFinderPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -19,54 +22,61 @@ export default async function LeadFinderPage({ searchParams }: LeadFinderPagePro
   const input = parseSearch(params);
   const hasSearch = Boolean(input.query && input.location);
   const providersConfigured = {
+    osm: true,
     google: Boolean(process.env.GOOGLE_PLACES_API_KEY),
     yelp: Boolean(process.env.YELP_API_KEY)
   };
+  const defaultProvider = providersConfigured.google ? "google_places" : "auto";
 
   try {
-    const leads =
-      hasSearch && (providersConfigured.google || providersConfigured.yelp)
-        ? await findLeadsOnline(input)
-        : [];
+    const [leads, recentRuns] = await Promise.all([
+      hasSearch
+        ? findLeadsOnline(input)
+        : Promise.resolve([]),
+      getDiscoveryRuns()
+    ]);
 
     return (
       <div className="space-y-6">
         <PageHeader
           title="Lead finder"
-          description="Search local businesses online, detect website and booking-system signals, then save dialable leads to the pipeline."
+          description="Build a practical calling list from local businesses with phone numbers, real website gaps, and no detected booking system."
         />
 
-        <LeadSearchForm searchParams={params} />
+        <LeadSearchForm searchParams={params} defaultProvider={defaultProvider} />
 
         {!providersConfigured.google && !providersConfigured.yelp ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertCircle className="h-5 w-5 text-amber-600" aria-hidden="true" />
-                Add a discovery API key
+                Using free discovery
               </CardTitle>
               <CardDescription>
-                Add `GOOGLE_PLACES_API_KEY` or `YELP_API_KEY` to `.env.local`, then restart the dev server.
+                OpenStreetMap is available without API keys. Google quality mode uses your paid Places limit and creates stronger calling matches.
               </CardDescription>
             </CardHeader>
           </Card>
         ) : null}
 
-        {providersConfigured.google || providersConfigured.yelp ? (
-          <div className="flex flex-wrap gap-2">
-            <Badge variant={providersConfigured.google ? "success" : "secondary"}>
-              Google Places {providersConfigured.google ? "ready" : "not configured"}
-            </Badge>
-            <Badge variant={providersConfigured.yelp ? "success" : "secondary"}>
-              Yelp {providersConfigured.yelp ? "ready" : "not configured"}
-            </Badge>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="success">OpenStreetMap ready</Badge>
+          <Badge variant={providersConfigured.google ? "success" : "secondary"}>
+            Google Places {providersConfigured.google ? "quality mode" : "not configured"}
+          </Badge>
+          <Badge variant={providersConfigured.yelp ? "success" : "secondary"}>
+            Yelp {providersConfigured.yelp ? "limited" : "not configured"}
+          </Badge>
+          <Badge variant="info">Solved websites hidden</Badge>
+        </div>
 
         {hasSearch ? (
           leads.length ? (
             <div className="space-y-4">
               <LeadFinderSummary leads={leads} />
+              <div className="flex justify-end">
+                <SaveDiscoveryRunButton search={input} leads={leads} />
+              </div>
               <Card>
                 <CardContent className="p-0">
                   <DiscoveredLeadsTable leads={leads} />
@@ -89,7 +99,7 @@ export default async function LeadFinderPage({ searchParams }: LeadFinderPagePro
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                The app will prioritize businesses with phone numbers, no website, or a website without a detected booking system.
+                Google quality mode searches multiple niche variants, dedupes results, then prioritizes dialable businesses with a real website gap. Strong sites, booking systems, and solved restaurant presences are filtered out of the live list.
               </p>
             </CardContent>
           </Card>
@@ -103,6 +113,8 @@ export default async function LeadFinderPage({ searchParams }: LeadFinderPagePro
             </CardDescription>
           </CardHeader>
         </Card>
+
+        <RecentDiscoveryRuns runs={recentRuns} />
       </div>
     );
   } catch (error) {
@@ -116,7 +128,9 @@ function parseSearch(params: Record<string, string | string[] | undefined>): Lea
     return typeof raw === "string" ? raw : fallback;
   };
 
-  const provider = value("provider", "auto");
+  const provider = value("provider", process.env.GOOGLE_PLACES_API_KEY ? "google_places" : "auto");
+  const searchDepth = value("searchDepth", "standard");
+  const qualityFilter = value("qualityFilter", "reviewable");
 
   return {
     query: value("query").trim(),
@@ -124,9 +138,19 @@ function parseSearch(params: Record<string, string | string[] | undefined>): Lea
     radiusMiles: clampNumber(value("radiusMiles", "10"), 1, 25, 10),
     maxResults: clampNumber(value("maxResults", "10"), 1, 20, 10),
     provider:
-      provider === "google_places" || provider === "yelp" || provider === "auto"
+      provider === "google_places" || provider === "yelp" || provider === "osm_overpass" || provider === "auto"
         ? provider
-        : "auto"
+        : "auto",
+    searchDepth:
+      searchDepth === "focused" || searchDepth === "standard" || searchDepth === "deep"
+        ? searchDepth
+        : "standard",
+    qualityFilter:
+      qualityFilter === "call_ready" || qualityFilter === "reviewable" || qualityFilter === "all"
+        ? qualityFilter
+        : "reviewable",
+    minReviews: clampNumber(value("minReviews", "5"), 0, 500, 5),
+    minRating: clampDecimal(value("minRating", "0"), 0, 5, 0)
   };
 }
 
@@ -134,4 +158,10 @@ function clampNumber(value: string, min: number, max: number, fallback: number) 
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(Math.max(Math.round(parsed), min), max);
+}
+
+function clampDecimal(value: string, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(parsed, min), max);
 }

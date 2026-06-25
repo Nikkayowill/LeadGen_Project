@@ -5,41 +5,45 @@ import type { LeadFilters as LeadFilterInput } from "@/lib/types/domain";
 import { getTodayDate } from "@/lib/utils";
 
 export async function getLeads(filters: LeadFilterInput = {}) {
-  const supabase = createServerSupabaseClient();
-  let query = supabase.from("leads").select("*").order("created_at", { ascending: false });
+  try {
+    const supabase = createServerSupabaseClient();
+    let query = supabase.from("leads").select("*").order("created_at", { ascending: false });
 
-  if (filters.q) {
-    query = query.ilike("business_name", `%${filters.q}%`);
-  }
-
-  if (filters.status) {
-    query = query.eq("lead_status", filters.status);
-  }
-
-  if (filters.industry) {
-    query = query.ilike("industry", filters.industry);
-  }
-
-  if (filters.websiteStatus) {
-    query = query.eq("website_status", filters.websiteStatus);
-  }
-
-  if (filters.followUp) {
-    const today = getTodayDate();
-    if (filters.followUp === "today") {
-      query = query.eq("next_follow_up", today);
+    if (filters.q) {
+      query = query.ilike("business_name", `%${filters.q}%`);
     }
-    if (filters.followUp === "overdue") {
-      query = query.lt("next_follow_up", today);
-    }
-    if (filters.followUp === "upcoming") {
-      query = query.gt("next_follow_up", today);
-    }
-  }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data ?? [];
+    if (filters.status) {
+      query = query.eq("lead_status", filters.status);
+    }
+
+    if (filters.industry) {
+      query = query.ilike("industry", filters.industry);
+    }
+
+    if (filters.websiteStatus) {
+      query = query.eq("website_status", filters.websiteStatus);
+    }
+
+    if (filters.followUp) {
+      const today = getTodayDate();
+      if (filters.followUp === "today") {
+        query = query.eq("next_follow_up", today);
+      }
+      if (filters.followUp === "overdue") {
+        query = query.lt("next_follow_up", today);
+      }
+      if (filters.followUp === "upcoming") {
+        query = query.gt("next_follow_up", today);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) return [];
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getLeadById(id: string) {

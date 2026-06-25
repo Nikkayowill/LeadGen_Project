@@ -1,8 +1,8 @@
-# Local Sales Pipeline MVP
+# SiteScout
 
-A scalable MVP sales pipeline for a local web developer selling websites to small businesses.
+A sales pipeline app for a local web developer selling websites to small businesses.
 
-The app tracks local business leads, follow-ups, pitches, demos, interactions, deals, pricing defaults, and generated outreach copy. Branding, naming, and logo space are intentionally left neutral so the product identity can come later.
+The app tracks local business leads, follow-ups, pitches, demos, interactions, deals, pricing defaults, and outreach copy.
 
 ## Tech Stack
 
@@ -58,7 +58,20 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 GOOGLE_PLACES_API_KEY=
 YELP_API_KEY=
+GOOGLE_PLACES_DAILY_LIMIT=10
+GOOGLE_PLACES_MAX_RESULTS=5
+YELP_DAILY_LIMIT=10
+YELP_MAX_RESULTS=5
+LEAD_FINDER_ALLOW_PAID_AUTO=false
+ALLOWED_ORIGINS=
+RATE_LIMIT_REQUESTS_PER_MINUTE=10
+RATE_LIMIT_REQUESTS_PER_HOUR=60
 ```
+
+`ALLOWED_ORIGINS` is optional and comma-separated. Leave it empty for strict same-origin protection.
+The middleware also rate-limits unsafe requests per IP and path so server actions do not accept bursts.
+
+Google Places and Yelp are optional. The Lead Finder can run with OpenStreetMap/Overpass without API keys, though coverage varies by location and niche.
 
 Run the app:
 
@@ -72,6 +85,21 @@ Open:
 http://localhost:3000
 ```
 
+## Local-Only Use
+
+This app can run only on your machine. You do not need to deploy it anywhere if your workflow is: search leads, save them, then call from your local browser.
+
+For local-only development, server-side Supabase calls can use a service role key by setting:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_USE_SERVICE_ROLE=true
+```
+
+This bypasses RLS for local use. Do not deploy a public app with `SUPABASE_USE_SERVICE_ROLE=true` unless you first add real authentication and account-scoped authorization.
+
+The app still needs internet access for hosted Supabase, Google Places, Yelp, and OpenStreetMap. To make the database itself local, you would need a local Supabase/Postgres setup.
+
 ## Supabase Setup
 
 Create a Supabase project, then run the SQL migrations in order:
@@ -79,6 +107,18 @@ Create a Supabase project, then run the SQL migrations in order:
 ```txt
 supabase/migrations/001_initial_schema.sql
 supabase/migrations/002_lead_discovery.sql
+supabase/migrations/003_discovery_runs_and_staging.sql
+supabase/migrations/004_openstreetmap_provider.sql
+supabase/migrations/005_conversion_strength.sql
+supabase/migrations/006_development_rls_policies.sql
+supabase/migrations/007_discovery_methodology_and_api_limits.sql
+supabase/migrations/008_google_quality_search_methodology.sql
+```
+
+For the easiest setup, paste and run this combined SQL file in the Supabase SQL Editor:
+
+```txt
+supabase/setup.sql
 ```
 
 The schema creates:
@@ -88,8 +128,19 @@ The schema creates:
 - `pitch_templates`
 - `deals`
 - `pricing_templates`
+- `discovery_runs`
+- `discovered_leads`
+- `api_usage_events`
 
 It also adds indexes for status, industry, website status, follow-up date, business-name search, and future `account_id` filtering.
+
+After running the SQL, verify the app is ready:
+
+```bash
+npm run check:ready
+```
+
+If `check:supabase` says a table is missing, rerun `supabase/setup.sql` in the same Supabase project connected by `.env.local`.
 
 ## Lead Finder
 
@@ -110,57 +161,60 @@ restaurants in Charlottetown, PE
 
 The finder uses:
 
-- `GOOGLE_PLACES_API_KEY` for Google Places local business results
-- `YELP_API_KEY` as an optional fallback provider
+- OpenStreetMap/Overpass for free local business discovery
+- Nominatim for one free location lookup per search
+- `GOOGLE_PLACES_API_KEY` for Google quality mode with dialable business data
+- `YELP_API_KEY` as an optional paid fallback provider
+
+Paid-provider guardrails:
+
+- Auto mode is free-only by default. Set `LEAD_FINDER_ALLOW_PAID_AUTO=true` only when you want Auto to fall back to Google/Yelp.
+- Google defaults to `10` paid searches per day and `5` results per search.
+- Yelp defaults to `10` paid searches per day and `5` results per search.
+- Google quality mode supports `Focused`, `Standard`, and `Deep` search depth. Focused uses 1 query, Standard uses up to 3 query variants, and Deep uses up to 6 query variants.
+- Usage is recorded in `api_usage_events` so the limit survives app restarts.
+
+Google quality mode works like a lightweight lead-source engine:
+
+- Expands a niche into nearby buying-intent searches, such as `plumber`, `plumbing contractor`, and `emergency plumber`.
+- Filters by minimum review count and optional minimum rating so the list is warmer.
+- Dedupes businesses across query variants.
+- Enriches websites for booking, ordering, conversion, and weak-site signals.
+- Shows only call-ready or reviewable prospects by default.
 
 For each discovered business, the app tries to show:
 
 - Phone number for dialing
 - Website URL or no-website status
 - Detected booking or appointment system
-- Lead score
-- Opportunity grade and call priority
+- Contactability score
+- Website gap classification
+- Opportunity grade and call fit
 - Existing-lead detection so saved businesses move to the bottom
 - Reasons the lead may be worth contacting
 
-Click `Save` to add a discovered business to the normal pipeline.
+Click `Save` to add a discovered business to the normal pipeline. Click `Save as run` to store the whole search as a discovery run with staged prospects you can review later.
 
 Lead Finder now ranks results like a prospecting console:
 
-- `A` grade: call first
-- `B` grade: good call
-- `C` grade: maybe later
-- `D` grade: low priority or research first
+- `Call now`: phone number plus a strong website gap, with no detected booking system
+- `Review first`: useful but needs a quick manual website check
+- `Research`: not enough contact or website evidence yet
+- `Skip`: solved businesses with strong websites, booking systems, or strong conversion flow
 
-The scoring model rewards businesses with a phone number, no website, weak/thin websites, weak contact CTAs, no detected booking system, local-service categories, and signs of existing local demand. It downranks businesses with stronger sites or already-detected booking systems.
+The scoring model rewards businesses with a phone number, provider-level no-website evidence, weak/thin websites, weak contact CTAs, local-service categories, and signs of existing local demand. It hides solved businesses from live results when they already have a strong site, booking/ordering/reservation system, or strong conversion flow.
 
-The booking detector currently checks for common systems and signals such as Calendly, Acuity, Square Appointments, Vagaro, Mindbody, Fresha, OpenTable, Resy, Toast, Tock, Booksy, Jane App, Boulevard, Shopify, and generic booking CTAs.
+Batch 1 of the prospecting backbone adds:
 
-## Codex MCP For Supabase
+- Saved discovery runs by niche/location
+- Staged discovered leads before they become pipeline leads
+- Recent discovery runs on `/lead-finder`
+- Review pages at `/lead-finder/runs/[id]`
+- Promote-to-pipeline actions that avoid duplicate leads
 
-This repo is ready to work with the hosted Supabase MCP server in Codex.
+The booking detector currently checks for common systems and signals such as Calendly, Acuity, Square Appointments, Vagaro, Mindbody, Fresha, OpenTable, Resy, SevenRooms, Toast, Tock, DoorDash, ChowNow, Booksy, GlossGenius, Jane App, Jobber, Housecall Pro, Boulevard, Shopify, and generic booking CTAs.
 
-The MCP server is added globally to Codex with:
-
-```bash
-codex mcp add supabase --url https://mcp.supabase.com/mcp
-```
-
-Then authenticate in a normal terminal:
-
-```bash
-codex mcp login supabase
-```
-
-After login, restart Codex and ask it to use the Supabase MCP tools to inspect or apply migrations.
-
-For development safety, keep MCP connected to a development Supabase project rather than production data. If you want the MCP server scoped to one project later, use your Supabase project ref with:
-
-```bash
-codex mcp remove supabase
-codex mcp add supabase --url "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF"
-codex mcp login supabase
-```
+Free-provider note: OpenStreetMap data is community-maintained. Many businesses will not have phone numbers or websites listed, but the results are free and useful for building a low-cost prospecting workflow. Public Nominatim usage should stay light; this app performs one location lookup per search.
 
 ## Useful Commands
 
@@ -168,6 +222,9 @@ codex mcp login supabase
 npm run typecheck
 npm run build
 npm run dev
+npm run check:env
+npm run check:supabase
+npm run check:ready
 ```
 
 ## Notes For Future Growth
@@ -175,5 +232,4 @@ npm run dev
 - Replace manual `lib/types/database.ts` with generated Supabase types once the hosted project exists.
 - Add Supabase Auth and attach `account_id` to authenticated users.
 - Add row-level security policies before production use.
-- Move pitch generation behind an AI service module when AI features are added.
 - Add tests around services and server actions as workflows stabilize.

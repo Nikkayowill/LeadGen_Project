@@ -5,24 +5,26 @@ import type { DiscoveredLead } from "@/lib/types/discovery";
 export function LeadFinderSummary({ leads }: { leads: DiscoveredLead[] }) {
   const freshLeads = leads.filter((lead) => !lead.isExistingLead);
   const dialable = freshLeads.filter((lead) => Boolean(lead.phone)).length;
-  const gradeA = freshLeads.filter((lead) => lead.opportunityGrade === "A").length;
-  const noWebsite = freshLeads.filter((lead) => !lead.hasWebsite).length;
+  const callNow = freshLeads.filter((lead) => lead.discoveryFit === "call_now").length;
+  const websiteGaps = freshLeads.filter((lead) =>
+    ["provider_no_website", "weak_website"].includes(lead.websiteGap)
+  ).length;
   const topLead = freshLeads[0];
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <SummaryCard title="Fresh leads" value={freshLeads.length} icon={Radar} detail="Not already saved" />
       <SummaryCard title="Dialable" value={dialable} icon={Phone} detail="Phone number found" />
-      <SummaryCard title="A-grade" value={gradeA} icon={Star} detail="Highest opportunity tier" />
+      <SummaryCard title="Call now" value={callNow} icon={Star} detail="Phone plus real website gap" />
       <SummaryCard
         title="Best next call"
         value={topLead?.businessName ?? "None"}
         icon={Target}
         detail={topLead ? `${topLead.leadScore}/100 · ${topLead.priorityLabel}` : "Try a broader search"}
       />
-      {noWebsite > 0 ? (
+      {websiteGaps > 0 ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:col-span-2 xl:col-span-4">
-          {noWebsite} fresh lead{noWebsite === 1 ? "" : "s"} came back with no website listed. That is usually the easiest opening call.
+          {websiteGaps} fresh lead{websiteGaps === 1 ? "" : "s"} have a clear website gap and no detected booking system.
         </div>
       ) : null}
     </div>
