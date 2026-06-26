@@ -22,7 +22,19 @@ const defaultLimits: Record<PaidProvider, LimitConfig> = {
 const memoryUsage = new Map<string, number>();
 
 export function paidAutoFallbackEnabled() {
-  return process.env.LEAD_FINDER_ALLOW_PAID_AUTO === "true";
+  return paidProvidersEnabled() && process.env.LEAD_FINDER_ALLOW_PAID_AUTO === "true";
+}
+
+export function paidProvidersEnabled() {
+  return process.env.LEAD_FINDER_ENABLE_PAID_PROVIDERS === "true";
+}
+
+export function assertPaidProviderEnabled(provider: PaidProvider) {
+  if (!paidProvidersEnabled()) {
+    throw new Error(
+      `${getProviderLabel(provider)} is disabled for this deployment. Set LEAD_FINDER_ENABLE_PAID_PROVIDERS=true only when you intentionally want public searches to use paid APIs.`
+    );
+  }
 }
 
 export function clampPaidResults(provider: PaidProvider, requested: number) {
@@ -31,6 +43,7 @@ export function clampPaidResults(provider: PaidProvider, requested: number) {
 }
 
 export async function guardPaidProviderUsage(provider: PaidProvider, input: LeadFinderSearch) {
+  assertPaidProviderEnabled(provider);
   const config = getLimitConfig(provider);
   const today = new Date().toISOString().slice(0, 10);
   const used = await getDailyUsage(provider, today);

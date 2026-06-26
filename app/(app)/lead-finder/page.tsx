@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { LeadFinderSearch } from "@/lib/types/discovery";
 import { findLeadsOnline } from "@/services/discovery";
 import { getDiscoveryRuns } from "@/services/discovery-runs";
+import { paidProvidersEnabled } from "@/services/discovery/provider-limits";
 
 type LeadFinderPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -21,12 +22,13 @@ export default async function LeadFinderPage({ searchParams }: LeadFinderPagePro
   const params = await searchParams;
   const input = parseSearch(params);
   const hasSearch = Boolean(input.query && input.location);
+  const paidEnabled = paidProvidersEnabled();
   const providersConfigured = {
     osm: true,
-    google: Boolean(process.env.GOOGLE_PLACES_API_KEY),
-    yelp: Boolean(process.env.YELP_API_KEY)
+    google: paidEnabled && Boolean(process.env.GOOGLE_PLACES_API_KEY),
+    yelp: paidEnabled && Boolean(process.env.YELP_API_KEY)
   };
-  const defaultProvider = providersConfigured.google ? "google_places" : "auto";
+  const defaultProvider = "auto";
 
   try {
     const [leads, recentRuns] = await Promise.all([
@@ -43,7 +45,11 @@ export default async function LeadFinderPage({ searchParams }: LeadFinderPagePro
           description="Build a practical calling list from local businesses with phone numbers, real website gaps, and no detected booking system."
         />
 
-        <LeadSearchForm searchParams={params} defaultProvider={defaultProvider} />
+        <LeadSearchForm
+          searchParams={params}
+          defaultProvider={defaultProvider}
+          paidProvidersEnabled={paidEnabled}
+        />
 
         {!providersConfigured.google && !providersConfigured.yelp ? (
           <Card>
@@ -53,7 +59,7 @@ export default async function LeadFinderPage({ searchParams }: LeadFinderPagePro
                 Using free discovery
               </CardTitle>
               <CardDescription>
-                OpenStreetMap is available without API keys. Google quality mode uses your paid Places limit and creates stronger calling matches.
+                OpenStreetMap is available without API keys. Paid providers stay disabled until you intentionally enable them for this deployment.
               </CardDescription>
             </CardHeader>
           </Card>

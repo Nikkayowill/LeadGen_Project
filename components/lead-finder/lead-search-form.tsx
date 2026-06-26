@@ -6,10 +6,12 @@ import { Select } from "@/components/ui/select";
 
 export function LeadSearchForm({
   searchParams,
-  defaultProvider = "auto"
+  defaultProvider = "auto",
+  paidProvidersEnabled = false
 }: {
   searchParams: Record<string, string | string[] | undefined>;
   defaultProvider?: string;
+  paidProvidersEnabled?: boolean;
 }) {
   const getValue = (key: string, fallback = "") => {
     const value = searchParams[key];
@@ -65,8 +67,8 @@ export function LeadSearchForm({
         <Select id="provider" name="provider" defaultValue={getValue("provider", defaultProvider)}>
           <option value="auto">Auto free-only</option>
           <option value="osm_overpass">OpenStreetMap</option>
-          <option value="google_places">Google quality</option>
-          <option value="yelp">Yelp limited</option>
+          {paidProvidersEnabled ? <option value="google_places">Google quality</option> : null}
+          {paidProvidersEnabled ? <option value="yelp">Yelp limited</option> : null}
         </Select>
       </div>
       <div className="space-y-2">

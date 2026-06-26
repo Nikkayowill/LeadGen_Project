@@ -3,7 +3,7 @@ import { enrichWebsite } from "@/services/discovery/enrichment";
 import { markExistingLeads } from "@/services/discovery/existing-leads";
 import { searchGooglePlaces } from "@/services/discovery/google-places";
 import { searchOpenStreetMap } from "@/services/discovery/openstreetmap";
-import { paidAutoFallbackEnabled } from "@/services/discovery/provider-limits";
+import { paidAutoFallbackEnabled, paidProvidersEnabled } from "@/services/discovery/provider-limits";
 import { scoreDiscoveredLead } from "@/services/discovery/scoring";
 import { searchYelp } from "@/services/discovery/yelp";
 
@@ -50,8 +50,8 @@ export async function findLeadsOnline(input: LeadFinderSearch) {
 
 async function searchProviders(input: LeadFinderSearch) {
   if (input.provider === "osm_overpass") return searchOpenStreetMap(input);
-  if (input.provider === "google_places") return searchGooglePlaces(input);
-  if (input.provider === "yelp") return searchYelp(input);
+  if (input.provider === "google_places") return paidProvidersEnabled() ? searchGooglePlaces(input) : [];
+  if (input.provider === "yelp") return paidProvidersEnabled() ? searchYelp(input) : [];
 
   const osmResults = await searchOpenStreetMap(input);
   if (osmResults.length) return osmResults;

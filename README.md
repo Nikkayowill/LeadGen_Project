@@ -56,8 +56,12 @@ Fill in:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+APP_ACCESS_USERNAME=nikkayo
+APP_ACCESS_PASSWORD=
+APP_PUBLIC_DEMO=false
 GOOGLE_PLACES_API_KEY=
 YELP_API_KEY=
+LEAD_FINDER_ENABLE_PAID_PROVIDERS=false
 GOOGLE_PLACES_DAILY_LIMIT=10
 GOOGLE_PLACES_MAX_RESULTS=5
 YELP_DAILY_LIMIT=10
@@ -69,7 +73,9 @@ RATE_LIMIT_REQUESTS_PER_HOUR=60
 ```
 
 `ALLOWED_ORIGINS` is optional and comma-separated. Leave it empty for strict same-origin protection.
+`APP_ACCESS_PASSWORD` protects public deployments with browser basic auth. In production, the app fails closed when no password is configured unless `APP_PUBLIC_DEMO=true`.
 The middleware also rate-limits unsafe requests per IP and path so server actions do not accept bursts.
+Lead Finder searches are rate-limited too because search requests can call external providers.
 
 Google Places and Yelp are optional. The Lead Finder can run with OpenStreetMap/Overpass without API keys, though coverage varies by location and niche.
 
@@ -163,12 +169,13 @@ The finder uses:
 
 - OpenStreetMap/Overpass for free local business discovery
 - Nominatim for one free location lookup per search
-- `GOOGLE_PLACES_API_KEY` for Google quality mode with dialable business data
-- `YELP_API_KEY` as an optional paid fallback provider
+- `GOOGLE_PLACES_API_KEY` for Google quality mode with dialable business data, only when paid providers are enabled
+- `YELP_API_KEY` as an optional paid fallback provider, only when paid providers are enabled
 
 Paid-provider guardrails:
 
-- Auto mode is free-only by default. Set `LEAD_FINDER_ALLOW_PAID_AUTO=true` only when you want Auto to fall back to Google/Yelp.
+- Paid providers are disabled by default. Set `LEAD_FINDER_ENABLE_PAID_PROVIDERS=true` only when you intentionally want public searches to use Google/Yelp.
+- Auto mode is free-only by default. Set `LEAD_FINDER_ALLOW_PAID_AUTO=true` only when you also want Auto to fall back to Google/Yelp.
 - Google defaults to `10` paid searches per day and `5` results per search.
 - Yelp defaults to `10` paid searches per day and `5` results per search.
 - Google quality mode supports `Focused`, `Standard`, and `Deep` search depth. Focused uses 1 query, Standard uses up to 3 query variants, and Deep uses up to 6 query variants.
