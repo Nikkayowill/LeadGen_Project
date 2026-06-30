@@ -16,7 +16,7 @@ export function InteractionList({ interactions }: { interactions: Interaction[] 
   return (
     <div className="space-y-3">
       {interactions.map((interaction) => (
-        <div key={interaction.id} className="rounded-lg border bg-card p-4">
+        <div key={interaction.id} className="rounded-sm border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <Badge variant="secondary">{interaction.type}</Badge>
             <span className="text-xs text-muted-foreground">{formatDate(interaction.created_at.slice(0, 10))}</span>

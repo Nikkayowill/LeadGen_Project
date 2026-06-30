@@ -1,10 +1,6 @@
 import type { DiscoveryCandidate, LeadFinderSearch } from "@/lib/types/discovery";
-
-type NominatimResult = {
-  lat: string;
-  lon: string;
-  display_name?: string;
-};
+import { getDiscoveryRejection } from "@/services/discovery/gatekeeper";
+import { geocodeLocation, type Coordinates } from "@/services/discovery/geocoding";
 
 type OverpassElement = {
   type: "node" | "way" | "relation";
@@ -19,6 +15,11 @@ type OverpassResponse = {
   elements?: OverpassElement[];
 };
 
+type QueryProfile = {
+  selectors: string[];
+  matchTerms?: string[];
+};
+
 const providerHeaders = {
   "user-agent": "LeadGenPipeline/0.1 local prospect research",
   accept: "application/json"
@@ -28,9 +29,9 @@ export async function searchOpenStreetMap(input: LeadFinderSearch): Promise<Disc
   const coordinates = await geocodeLocation(input.location);
   if (!coordinates) return [];
 
-  const selectors = getSelectorsForQuery(input.query);
+  const profile = getQueryProfile(input.query);
   const radiusMeters = Math.min(Math.max(Math.round(input.radiusMiles * 1609.34), 1000), 40000);
-  const overpassQuery = buildOverpassQuery(selectors, coordinates.lat, coordinates.lon, radiusMeters, input.maxResults);
+  const overpassQuery = buildOverpassQuery(profile.selectors, coordinates.lat, coordinates.lon, radiusMeters, input.maxResults);
 
   const response = await fetch("https://overpass-api.de/api/interpreter", {
     method: "POST",
@@ -51,38 +52,10 @@ export async function searchOpenStreetMap(input: LeadFinderSearch): Promise<Disc
   return (payload.elements ?? [])
     .map((element) => toDiscoveryCandidate(element, input))
     .filter((lead): lead is DiscoveryCandidate => Boolean(lead))
+    .filter((lead) => matchesQueryProfile(lead, profile))
+    .filter((lead) => !getDiscoveryRejection(lead))
+    .sort((a, b) => getCandidateRank(b, coordinates) - getCandidateRank(a, coordinates))
     .slice(0, input.maxResults);
-}
-
-async function geocodeLocation(location: string) {
-  const params = new URLSearchParams({
-    q: location,
-    format: "jsonv2",
-    limit: "1"
-  });
-
-  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-    headers: providerHeaders,
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    throw new Error("OpenStreetMap location lookup failed.");
-  }
-
-  const results = (await response.json()) as NominatimResult[];
-  const first = results[0];
-  if (!first) return null;
-
-  const lat = Number(first.lat);
-  const lon = Number(first.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-
-  return {
-    lat,
-    lon,
-    label: first.display_name ?? location
-  };
 }
 
 function buildOverpassQuery(
@@ -93,6 +66,7 @@ function buildOverpassQuery(
   maxResults: number
 ) {
   const selectorBlock = selectors
+    .map((selector) => `${selector}${noWebsiteTagFilters}`)
     .flatMap((selector) => [
       `node(around:${radiusMeters},${lat},${lon})${selector};`,
       `way(around:${radiusMeters},${lat},${lon})${selector};`,
@@ -109,32 +83,111 @@ out center qt ${Math.min(Math.max(maxResults * 3, 20), 80)};
 `;
 }
 
-function getSelectorsForQuery(query: string) {
+const noWebsiteTagFilters = [
+  '["website"!~"."]',
+  '["contact:website"!~"."]',
+  '["url"!~"."]',
+  '["brand:website"!~"."]'
+].join("");
+
+function getQueryProfile(query: string): QueryProfile {
   const normalized = query.toLowerCase();
 
+  if (matches(normalized, ["plumber", "plumbing"])) {
+    return {
+      selectors: ['["craft"="plumber"]', '["name"~"plumb",i]'],
+      matchTerms: ["plumb"]
+    };
+  }
+  if (matches(normalized, ["electrician", "electrical"])) {
+    return {
+      selectors: ['["craft"="electrician"]', '["name"~"electric",i]'],
+      matchTerms: ["electric"]
+    };
+  }
+  if (matches(normalized, ["roofer", "roofing"])) {
+    return {
+      selectors: ['["craft"="roofer"]', '["name"~"roof",i]'],
+      matchTerms: ["roof"]
+    };
+  }
+  if (matches(normalized, ["cleaner", "cleaning", "maid"])) {
+    return {
+      selectors: ['["craft"="cleaner"]', '["name"~"clean|maid|janitor",i]'],
+      matchTerms: ["clean", "maid", "janitor"]
+    };
+  }
+  if (matches(normalized, ["landscaping", "landscape", "lawn"])) {
+    return {
+      selectors: ['["craft"="landscaper"]', '["name"~"landscap|lawn",i]'],
+      matchTerms: ["landscap", "lawn"]
+    };
+  }
+  if (matches(normalized, ["pest", "exterminator"])) {
+    return {
+      selectors: ['["craft"="pest_control"]', '["name"~"pest|extermin",i]'],
+      matchTerms: ["pest", "extermin"]
+    };
+  }
+  if (matches(normalized, ["contractor", "construction", "renovation", "remodel"])) {
+    return {
+      selectors: [
+        '["craft"~"builder|carpenter|painter|plasterer|tiler|window_construction|hvac",i]',
+        '["name"~"contractor|construction|renovation|remodel|builder",i]'
+      ],
+      matchTerms: ["contractor", "construction", "renovation", "remodel", "builder", "carpenter"]
+    };
+  }
   if (matches(normalized, ["salon", "hair", "barber", "beauty"])) {
-    return ['["shop"="hairdresser"]', '["shop"="beauty"]', '["amenity"="spa"]'];
+    return {
+      selectors: ['["shop"="hairdresser"]', '["shop"="beauty"]', '["amenity"="spa"]'],
+      matchTerms: ["hair", "beauty", "barber", "spa", "salon"]
+    };
   }
-  if (matches(normalized, ["dentist", "dental"])) return ['["amenity"="dentist"]'];
+  if (matches(normalized, ["dentist", "dental"])) {
+    return { selectors: ['["amenity"="dentist"]'], matchTerms: ["dentist", "dental"] };
+  }
   if (matches(normalized, ["doctor", "clinic", "medical"])) {
-    return ['["amenity"="clinic"]', '["amenity"="doctors"]'];
+    return {
+      selectors: ['["amenity"="clinic"]', '["amenity"="doctors"]'],
+      matchTerms: ["clinic", "doctor", "medical"]
+    };
   }
-  if (matches(normalized, ["restaurant", "food", "diner"])) return ['["amenity"="restaurant"]'];
-  if (matches(normalized, ["cafe", "coffee"])) return ['["amenity"="cafe"]'];
-  if (matches(normalized, ["bar", "pub"])) return ['["amenity"="bar"]', '["amenity"="pub"]'];
-  if (matches(normalized, ["gym", "fitness"])) return ['["leisure"="fitness_centre"]'];
-  if (matches(normalized, ["repair", "mechanic", "auto"])) return ['["shop"="car_repair"]'];
+  if (matches(normalized, ["restaurant", "food", "diner"])) {
+    return { selectors: ['["amenity"="restaurant"]'], matchTerms: ["restaurant", "diner", "grill", "food"] };
+  }
+  if (matches(normalized, ["cafe", "coffee"])) {
+    return { selectors: ['["amenity"="cafe"]'], matchTerms: ["cafe", "coffee"] };
+  }
+  if (matches(normalized, ["bar", "pub"])) {
+    return { selectors: ['["amenity"="bar"]', '["amenity"="pub"]'], matchTerms: ["bar", "pub"] };
+  }
+  if (matches(normalized, ["gym", "fitness"])) {
+    return { selectors: ['["leisure"="fitness_centre"]'], matchTerms: ["gym", "fitness"] };
+  }
+  if (matches(normalized, ["repair", "mechanic", "auto"])) {
+    return {
+      selectors: ['["shop"="car_repair"]', '["craft"="mechanic"]'],
+      matchTerms: ["repair", "mechanic", "auto", "car"]
+    };
+  }
   if (matches(normalized, ["pet", "veterinary", "vet"])) {
-    return ['["shop"="pet"]', '["amenity"="veterinary"]'];
+    return { selectors: ['["shop"="pet"]', '["amenity"="veterinary"]'], matchTerms: ["pet", "vet"] };
   }
-  if (matches(normalized, ["law", "lawyer", "attorney"])) return ['["office"="lawyer"]'];
-  if (matches(normalized, ["real estate", "realtor"])) return ['["office"="estate_agent"]'];
-  if (matches(normalized, ["plumber", "electrician", "contractor", "roofer", "construction"])) {
-    return ['["craft"]', '["office"="company"]'];
+  if (matches(normalized, ["law", "lawyer", "attorney"])) {
+    return { selectors: ['["office"="lawyer"]'], matchTerms: ["law", "attorney"] };
   }
-  if (matches(normalized, ["shop", "store", "retail"])) return ['["shop"]'];
+  if (matches(normalized, ["real estate", "realtor"])) {
+    return { selectors: ['["office"="estate_agent"]'], matchTerms: ["real estate", "realtor", "estate"] };
+  }
+  if (matches(normalized, ["shop", "store", "retail"])) {
+    return { selectors: ['["shop"]'], matchTerms: getMeaningfulTerms(normalized) };
+  }
 
-  return ['["name"]["shop"]', '["name"]["amenity"]', '["name"]["office"]', '["name"]["craft"]'];
+  return {
+    selectors: ['["name"]["shop"]', '["name"]["amenity"]', '["name"]["office"]', '["name"]["craft"]'],
+    matchTerms: getMeaningfulTerms(normalized)
+  };
 }
 
 function toDiscoveryCandidate(element: OverpassElement, input: LeadFinderSearch): DiscoveryCandidate | null {
@@ -190,6 +243,81 @@ function getAddress(tags: Record<string, string>) {
   ].filter(Boolean);
 
   return parts.length ? parts.join(", ") : null;
+}
+
+function matchesQueryProfile(lead: DiscoveryCandidate, profile: QueryProfile) {
+  if (!profile.matchTerms?.length) return true;
+  const tags =
+    typeof lead.metadata === "object" &&
+    lead.metadata &&
+    !Array.isArray(lead.metadata) &&
+    typeof lead.metadata.tags === "object" &&
+    lead.metadata.tags &&
+    !Array.isArray(lead.metadata.tags)
+      ? lead.metadata.tags
+      : {};
+
+  const haystack = [
+    lead.businessName,
+    lead.industry,
+    lead.address,
+    ...Object.values(tags).filter((value): value is string => typeof value === "string")
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return profile.matchTerms.some((term) => haystack.includes(term));
+}
+
+function getCandidateRank(lead: DiscoveryCandidate, origin: Coordinates) {
+  let score = 0;
+  const distanceMiles = getDistanceMiles(lead, origin);
+
+  if (lead.phone) score += 40;
+  if (lead.websiteUrl) score += 24;
+  if (lead.address) score += 18;
+  if (distanceMiles !== null) score += Math.max(0, 20 - Math.round(distanceMiles));
+  if (hasExplicitNoWebsiteSignal(lead)) score += 8;
+
+  return score;
+}
+
+function getDistanceMiles(lead: DiscoveryCandidate, origin: Coordinates) {
+  const metadata = lead.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const lat = metadata.lat;
+  const lon = metadata.lon;
+  if (typeof lat !== "number" || typeof lon !== "number") return null;
+
+  const earthRadiusMiles = 3958.8;
+  const dLat = toRadians(lat - origin.lat);
+  const dLon = toRadians(lon - origin.lon);
+  const originLat = toRadians(origin.lat);
+  const candidateLat = toRadians(lat);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(originLat) * Math.cos(candidateLat) * Math.sin(dLon / 2) ** 2;
+
+  return 2 * earthRadiusMiles * Math.asin(Math.sqrt(a));
+}
+
+function hasExplicitNoWebsiteSignal(lead: DiscoveryCandidate) {
+  const metadata = lead.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
+  const tags = metadata.tags;
+  if (!tags || typeof tags !== "object" || Array.isArray(tags)) return false;
+  return tags.website === "no" || tags["contact:website"] === "no";
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function getMeaningfulTerms(query: string) {
+  return query
+    .split(/\s+/)
+    .map((term) => term.replace(/[^a-z0-9]/g, ""))
+    .filter((term) => term.length >= 4 && !["near", "local", "best", "company", "service", "services"].includes(term));
 }
 
 function normalizeUrl(value: string | undefined) {

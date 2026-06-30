@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { discoveredLeadToInsert, type DiscoveredLead, type LeadFinderSearch } from "@/lib/types/discovery";
 import type {
@@ -45,7 +46,7 @@ export async function createDiscoveryRun(input: LeadFinderSearch, leads: Discove
   return run;
 }
 
-export async function getDiscoveryRuns(limit = 8) {
+async function getDiscoveryRunsUncached(limit = 8) {
   try {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
@@ -60,6 +61,11 @@ export async function getDiscoveryRuns(limit = 8) {
     return [];
   }
 }
+
+export const getDiscoveryRuns = unstable_cache(getDiscoveryRunsUncached, ["discovery-runs:recent"], {
+  tags: ["discovery-runs"],
+  revalidate: 60
+});
 
 export async function getDiscoveryRunById(id: string) {
   const supabase = createServerSupabaseClient();

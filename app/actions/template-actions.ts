@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { DEFAULT_PRICING } from "@/lib/constants";
 import { addPitchTemplate, addPricingTemplate } from "@/services/templates";
 import type { ActionState } from "@/app/actions/lead-actions";
@@ -34,6 +34,7 @@ export async function addPitchTemplateAction(
       industry: textValue(formData, "industry"),
       message_body: messageBody
     });
+    revalidateTag("templates");
     revalidatePath("/settings");
     return {};
   } catch (error) {
@@ -58,6 +59,7 @@ export async function addPricingTemplateAction(
       monthly_price: numberValue(formData, "monthly_price", DEFAULT_PRICING.monthlyPrice),
       is_default: formData.get("is_default") === "on"
     });
+    revalidateTag("templates");
     revalidatePath("/settings");
     return {};
   } catch (error) {

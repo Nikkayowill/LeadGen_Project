@@ -14,7 +14,7 @@ export function RecentDiscoveryRuns({ runs }: { runs: DiscoveryRun[] }) {
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {runs.map((run) => (
-          <div key={run.id} className="rounded-lg border p-3">
+          <div key={run.id} className="rounded-sm border border-border bg-background/40 p-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
                 {run.query} in {run.location}

@@ -60,6 +60,7 @@ export function scoreDiscoveredLead(lead: ScoreInput) {
   let score = 5;
   const reasons: string[] = [];
   const provider = getStringMetadata(lead.metadata, "provider");
+  const chainSignal = getChainSignal(lead);
   const reviewCount = getNumericMetadata(lead.metadata, "reviewCount");
   const rating = getNumericMetadata(lead.metadata, "rating");
   const restaurantLike = isRestaurantLike(lead);
@@ -74,6 +75,10 @@ export function scoreDiscoveredLead(lead: ScoreInput) {
     if (provider === "osm_overpass") {
       score += 8;
       reasons.push("website not listed in OpenStreetMap");
+      reasons.push("manual website check needed");
+    } else if (provider === "yelp") {
+      score -= 3;
+      reasons.push("Yelp does not provide business website");
       reasons.push("manual website check needed");
     } else {
       score += 35;
@@ -185,7 +190,12 @@ export function scoreDiscoveredLead(lead: ScoreInput) {
     reasons.push("successful business signal");
   }
 
-  const cappedScore = getCappedScore(lead, score, provider, reviewCount, restaurantLike, alreadySolved);
+  if (chainSignal) {
+    score -= 18;
+    reasons.push(chainSignal);
+  }
+
+  const cappedScore = getCappedScore(lead, score, provider, restaurantLike, alreadySolved, Boolean(chainSignal));
   if (alreadySolved) reasons.push("already solved online");
 
   const leadScore = Math.max(0, Math.min(cappedScore, 100));
@@ -227,8 +237,8 @@ function isAlreadySolved(lead: ScoreInput, restaurantLike: boolean, reviewCount:
   if (lead.hasWebsite && lead.hasBookingSystem) return true;
   if (lead.hasWebsite && lead.conversionStrength === "strong") return true;
   if (lead.hasWebsite && lead.websiteQuality === "solid") return true;
-  if (lead.hasWebsite && restaurantLike && lead.conversionStrength !== "none") return true;
-  if (lead.hasWebsite && reviewCount >= 100) return true;
+  if (lead.hasWebsite && restaurantLike && lead.conversionStrength === "moderate") return true;
+  if (lead.hasWebsite && reviewCount >= 150 && lead.conversionStrength === "moderate") return true;
   return false;
 }
 
@@ -236,9 +246,9 @@ function getCappedScore(
   lead: ScoreInput,
   score: number,
   provider: string,
-  reviewCount: number,
   restaurantLike: boolean,
-  alreadySolved: boolean
+  alreadySolved: boolean,
+  hasChainSignal: boolean
 ) {
   let cappedScore = score;
 
@@ -262,16 +272,16 @@ function getCappedScore(
     cappedScore = Math.min(cappedScore, 29);
   }
 
-  if (lead.hasWebsite && restaurantLike) {
-    cappedScore = Math.min(cappedScore, 29);
-  }
-
-  if (lead.hasWebsite && reviewCount >= 100) {
+  if (lead.hasWebsite && restaurantLike && lead.conversionStrength !== "none") {
     cappedScore = Math.min(cappedScore, 29);
   }
 
   if (!lead.phone) {
     cappedScore = Math.min(cappedScore, 39);
+  }
+
+  if (hasChainSignal) {
+    cappedScore = Math.min(cappedScore, 59);
   }
 
   return cappedScore;
@@ -295,10 +305,16 @@ function getDiscoveryFit(
 function getWebsiteGap(lead: ScoreInput, provider: string): WebsiteGap {
   if (lead.hasBookingSystem) return "booking_present";
   if (!lead.hasWebsite && provider === "osm_overpass") return "not_listed";
+  if (!lead.hasWebsite && provider === "yelp") return "unverified";
   if (!lead.hasWebsite) return "provider_no_website";
   if (lead.websiteQuality === "unreachable") return "unverified";
-  if (lead.websiteQuality === "thin" && lead.conversionStrength === "none") return "weak_website";
-  if (lead.websiteQuality === "basic" && lead.conversionStrength === "none") return "weak_website";
+  if (lead.websiteQuality === "thin" && lead.conversionStrength !== "strong") return "weak_website";
+  if (
+    lead.websiteQuality === "basic" &&
+    (lead.conversionStrength === "none" || lead.conversionStrength === "weak")
+  ) {
+    return "weak_website";
+  }
   return "healthy_website";
 }
 
@@ -375,3 +391,64 @@ function getStringArrayMetadata(metadata: unknown, key: string) {
   const value = (metadata as Record<string, unknown>)[key];
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
+
+function getChainSignal(lead: ScoreInput) {
+  const name = lead.businessName.toLowerCase();
+  const brand = getNestedStringMetadata(lead.metadata, "tags", "brand").toLowerCase();
+  const operator = getNestedStringMetadata(lead.metadata, "tags", "operator").toLowerCase();
+  const value = `${name} ${brand} ${operator}`;
+
+  if (knownChainTerms.some((term) => value.includes(term))) {
+    return "chain/franchise signal";
+  }
+
+  if (brand && normalizeBusinessName(brand) === normalizeBusinessName(lead.businessName)) {
+    return "branded location signal";
+  }
+
+  return null;
+}
+
+function getNestedStringMetadata(metadata: unknown, parentKey: string, key: string) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return "";
+  const parent = (metadata as Record<string, unknown>)[parentKey];
+  if (!parent || typeof parent !== "object" || Array.isArray(parent)) return "";
+  const value = (parent as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : "";
+}
+
+function normalizeBusinessName(value: string) {
+  return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+}
+
+const knownChainTerms = [
+  "chatters",
+  "first choice hair",
+  "great clips",
+  "supercuts",
+  "magicuts",
+  "walmart",
+  "costco",
+  "starbucks",
+  "tim hortons",
+  "mcdonald",
+  "subway",
+  "burger king",
+  "kfc",
+  "domino",
+  "pizza hut",
+  "dairy queen",
+  "the home depot",
+  "canadian tire",
+  "shoppers drug mart",
+  "rexall",
+  "petvalu",
+  "goodlife fitness",
+  "orange theory",
+  "anytime fitness",
+  "snap fitness",
+  "midas",
+  "speedy auto",
+  "mr. lube",
+  "jiffy lube"
+];

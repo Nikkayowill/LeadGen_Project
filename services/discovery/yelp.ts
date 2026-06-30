@@ -1,4 +1,5 @@
 import type { DiscoveryCandidate, LeadFinderSearch } from "@/lib/types/discovery";
+import { getDiscoveryRejection } from "@/services/discovery/gatekeeper";
 import { guardPaidProviderUsage, recordPaidProviderUsage } from "@/services/discovery/provider-limits";
 
 type YelpBusiness = {
@@ -17,6 +18,7 @@ type YelpBusiness = {
   };
   rating?: number;
   review_count?: number;
+  is_closed?: boolean;
 };
 
 type YelpResponse = {
@@ -52,8 +54,9 @@ export async function searchYelp(
   }
 
   const results: DiscoveryCandidate[] = (payload.businesses ?? [])
+    .filter((business) => !business.is_closed)
     .filter((business) => passesDemandFilters(business, input))
-    .map((business) => ({
+    .map((business): DiscoveryCandidate => ({
       source: "yelp",
       sourcePlaceId: business.id,
       businessName: business.name,
@@ -68,9 +71,11 @@ export async function searchYelp(
         yelpUrl: business.url ?? null,
         categories: business.categories ?? [],
         rating: business.rating ?? null,
-        reviewCount: business.review_count ?? null
+        reviewCount: business.review_count ?? null,
+        websiteEvidence: "not_provided_by_yelp"
       }
-    }));
+    }))
+    .filter((lead) => !getDiscoveryRejection(lead));
 
   await recordPaidProviderUsage("yelp", input, results.length);
   return results;

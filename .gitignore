@@ -6,3 +6,5 @@ out
 dist
 coverage
 tsconfig.tsbuildinfo
+artifacts
+*.log

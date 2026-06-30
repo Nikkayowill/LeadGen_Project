@@ -1,8 +1,8 @@
 import { DEFAULT_PRICING } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
-import type { Lead } from "@/lib/types/database";
+import type { PitchLead } from "@/services/leads";
 
-export function generatePitchMessages(lead: Lead) {
+export function generatePitchMessages(lead: PitchLead) {
   const price = formatCurrency(lead.quoted_price ?? DEFAULT_PRICING.oneTimePrice);
   const monthly = formatCurrency(lead.monthly_fee ?? DEFAULT_PRICING.monthlyPrice);
   const business = lead.business_name;

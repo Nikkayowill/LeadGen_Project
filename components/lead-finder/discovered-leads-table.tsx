@@ -65,7 +65,7 @@ export function DiscoveredLeadsTable({ leads }: { leads: DiscoveredLead[] }) {
             </TableCell>
             <TableCell>
               <div className="space-y-2">
-                <WebsiteStatusBadge status={lead.hasWebsite ? "Unknown" : websiteStatusLabel(lead.source)} />
+                <WebsiteStatusBadge status={websiteStatusLabel(lead)} />
                 <Badge variant={gapVariant(lead.websiteGap)}>{gapLabel(lead.websiteGap)}</Badge>
                 <Badge variant={websiteQualityVariant(lead.websiteQuality)}>
                   {websiteQualityLabel(lead.websiteQuality)}
@@ -166,6 +166,9 @@ function websiteQualityLabel(quality: DiscoveredLead["websiteQuality"]) {
   return quality.replace("_", " ");
 }
 
-function websiteStatusLabel(source: DiscoveredLead["source"]) {
-  return source === "osm_overpass" ? "Not listed" : "No Website";
+function websiteStatusLabel(lead: DiscoveredLead) {
+  if (lead.hasWebsite) return "Unknown";
+  if (lead.websiteGap === "provider_no_website") return "No Website";
+  if (lead.websiteGap === "not_listed") return "Not listed";
+  return "Unknown";
 }

@@ -77,15 +77,13 @@ export type DiscoveryCandidate = Omit<
 >;
 
 export function discoveredLeadToInsert(lead: DiscoveredLead): LeadInsert {
-  const websiteStatus = lead.hasWebsite ? "Unknown" : "No Website";
-
   return {
     business_name: lead.businessName,
     phone: lead.phone,
     website_url: lead.websiteUrl,
     industry: lead.industry,
     location: lead.location ?? lead.address,
-    website_status: websiteStatus,
+    website_status: getWebsiteStatusForLead(lead),
     lead_status: "Not Contacted",
     source: lead.source,
     source_place_id: lead.sourcePlaceId,
@@ -106,4 +104,11 @@ export function discoveredLeadToInsert(lead: DiscoveredLead): LeadInsert {
       .filter(Boolean)
       .join("\n")
   };
+}
+
+function getWebsiteStatusForLead(lead: DiscoveredLead) {
+  if (lead.hasWebsite) return "Unknown";
+  if (lead.websiteGap === "provider_no_website") return "No Website";
+  if (lead.websiteGap === "not_listed") return "Not listed";
+  return "Unknown";
 }

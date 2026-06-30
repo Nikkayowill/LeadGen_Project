@@ -15,7 +15,7 @@ export function LeadFilters({
   };
 
   return (
-    <form className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-6">
+    <form className="grid gap-3 rounded-sm border border-border bg-card p-4 md:grid-cols-6">
       <div className="relative md:col-span-2">
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input

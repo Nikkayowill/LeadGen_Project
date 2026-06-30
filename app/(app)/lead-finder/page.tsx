@@ -134,7 +134,7 @@ function parseSearch(params: Record<string, string | string[] | undefined>): Lea
     return typeof raw === "string" ? raw : fallback;
   };
 
-  const provider = value("provider", process.env.GOOGLE_PLACES_API_KEY ? "google_places" : "auto");
+  const provider = value("provider", "auto");
   const searchDepth = value("searchDepth", "standard");
   const qualityFilter = value("qualityFilter", "reviewable");
 

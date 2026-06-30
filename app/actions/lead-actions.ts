@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { DEFAULT_PRICING } from "@/lib/constants";
 import { createLead, deleteLead, updateLead } from "@/services/leads";
@@ -53,8 +53,11 @@ export async function createLeadAction(
     const payload = leadPayload(formData);
     if (!payload.business_name) return { error: "Business name is required." };
     const lead = await createLead(payload);
+    revalidateTag("leads");
     revalidatePath("/leads");
     revalidatePath("/dashboard");
+    revalidatePath("/follow-ups");
+    revalidatePath("/pitch-generator");
     redirectTo = `/leads/${lead.id}`;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not create lead." };
@@ -73,9 +76,12 @@ export async function updateLeadAction(
     const payload = leadPayload(formData);
     if (!payload.business_name) return { error: "Business name is required." };
     await updateLead(id, payload);
+    revalidateTag("leads");
     revalidatePath("/leads");
     revalidatePath(`/leads/${id}`);
     revalidatePath("/dashboard");
+    revalidatePath("/follow-ups");
+    revalidatePath("/pitch-generator");
     redirectTo = `/leads/${id}`;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not update lead." };
@@ -87,8 +93,11 @@ export async function deleteLeadAction(formData: FormData) {
   const id = textValue(formData, "id");
   if (!id) return;
   await deleteLead(id);
+  revalidateTag("leads");
   revalidatePath("/leads");
   revalidatePath("/dashboard");
+  revalidatePath("/follow-ups");
+  revalidatePath("/pitch-generator");
   redirect("/leads");
 }
 

@@ -1,18 +1,21 @@
 import type { DiscoveryCandidate, LeadFinderSearch } from "@/lib/types/discovery";
+import { mergeDuplicateResults } from "@/services/discovery/candidates";
 import { enrichWebsite } from "@/services/discovery/enrichment";
 import { markExistingLeads } from "@/services/discovery/existing-leads";
 import { searchGooglePlaces } from "@/services/discovery/google-places";
 import { searchOpenStreetMap } from "@/services/discovery/openstreetmap";
 import { paidAutoFallbackEnabled, paidProvidersEnabled } from "@/services/discovery/provider-limits";
 import { scoreDiscoveredLead } from "@/services/discovery/scoring";
+import { verifyUnlistedWebsite } from "@/services/discovery/website-verification";
 import { searchYelp } from "@/services/discovery/yelp";
 
 export async function findLeadsOnline(input: LeadFinderSearch) {
   const baseResults = await searchProviders(input);
-  const deduped = dedupeResults(baseResults);
+  const deduped = mergeDuplicateResults(baseResults);
   const enrichmentLimit = Math.min(Math.max(input.maxResults * 3, input.maxResults), 60);
+  const verifiedNoWebsiteCandidates = await rejectVerifiedWebsiteCandidates(deduped.slice(0, enrichmentLimit));
   const enriched = await Promise.all(
-    deduped.slice(0, enrichmentLimit).map(async (lead) => {
+    verifiedNoWebsiteCandidates.map(async (lead) => {
       const website = await enrichWebsite(lead.websiteUrl);
       const enrichedLead = {
         ...lead,
@@ -48,19 +51,47 @@ export async function findLeadsOnline(input: LeadFinderSearch) {
     .slice(0, input.maxResults);
 }
 
+async function rejectVerifiedWebsiteCandidates(candidates: DiscoveryCandidate[]) {
+  return compactAsync(
+    await mapWithConcurrency(candidates, 5, async (lead) => {
+      if (lead.websiteUrl || lead.hasWebsite) return null;
+
+      const verifiedWebsite = await verifyUnlistedWebsite(lead);
+      if (verifiedWebsite) return null;
+
+      return {
+        ...lead,
+        metadata: {
+          ...(typeof lead.metadata === "object" && lead.metadata ? lead.metadata : {}),
+          websiteVerification: "no_likely_domain_match"
+        }
+      };
+    })
+  );
+}
+
 async function searchProviders(input: LeadFinderSearch) {
   if (input.provider === "osm_overpass") return searchOpenStreetMap(input);
   if (input.provider === "google_places") return paidProvidersEnabled() ? searchGooglePlaces(input) : [];
   if (input.provider === "yelp") return paidProvidersEnabled() ? searchYelp(input) : [];
 
-  const osmResults = await searchOpenStreetMap(input);
-  if (osmResults.length) return osmResults;
+  const osmResults = await searchAutoProvider(() => searchOpenStreetMap(input));
+  if (!paidAutoFallbackEnabled()) return osmResults;
 
-  if (!paidAutoFallbackEnabled()) return [];
+  const googleResults = await searchAutoProvider(() => searchGooglePlaces(input));
+  const blendedResults = [...googleResults, ...osmResults];
+  if (googleResults.length >= input.maxResults) return blendedResults;
 
-  const googleResults = await searchGooglePlaces(input);
-  if (googleResults.length) return googleResults;
-  return searchYelp(input);
+  const yelpResults = await searchAutoProvider(() => searchYelp(input));
+  return [...blendedResults, ...yelpResults];
+}
+
+async function searchAutoProvider(search: () => Promise<DiscoveryCandidate[]>) {
+  try {
+    return await search();
+  } catch {
+    return [];
+  }
 }
 
 function getFitRank(fit: string) {
@@ -76,14 +107,26 @@ function passesQualityFilter(fit: string, filter: LeadFinderSearch["qualityFilte
   return fit === "call_now";
 }
 
-function dedupeResults(
-  results: DiscoveryCandidate[]
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
 ) {
-  const seen = new Set<string>();
-  return results.filter((lead) => {
-    const key = `${lead.businessName.toLowerCase()}-${lead.phone ?? lead.address ?? lead.sourcePlaceId}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
+function compactAsync<T>(items: Array<T | null>) {
+  return items.filter((item): item is T => item !== null);
 }

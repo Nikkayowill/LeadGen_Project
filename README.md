@@ -175,7 +175,7 @@ The finder uses:
 Paid-provider guardrails:
 
 - Paid providers are disabled by default. Set `LEAD_FINDER_ENABLE_PAID_PROVIDERS=true` only when you intentionally want public searches to use Google/Yelp.
-- Auto mode is free-only by default. Set `LEAD_FINDER_ALLOW_PAID_AUTO=true` only when you also want Auto to fall back to Google/Yelp.
+- Auto mode is free-only by default. Set `LEAD_FINDER_ALLOW_PAID_AUTO=true` only when you also want Auto to blend Google/Yelp quality results with OpenStreetMap coverage.
 - Google defaults to `10` paid searches per day and `5` results per search.
 - Yelp defaults to `10` paid searches per day and `5` results per search.
 - Google quality mode supports `Focused`, `Standard`, and `Deep` search depth. Focused uses 1 query, Standard uses up to 3 query variants, and Deep uses up to 6 query variants.
@@ -184,6 +184,9 @@ Paid-provider guardrails:
 Google quality mode works like a lightweight lead-source engine:
 
 - Expands a niche into nearby buying-intent searches, such as `plumber`, `plumbing contractor`, and `emergency plumber`.
+- Biases Google quality searches around the searched city and radius instead of relying only on free-form location text.
+- Merges duplicates across providers so the best phone, website, address, reviews, and source metadata survive instead of whichever provider returned first.
+- Ranks OpenStreetMap results by practical calling value, including phone, website, address completeness, proximity, and explicit no-website signals.
 - Filters by minimum review count and optional minimum rating so the list is warmer.
 - Dedupes businesses across query variants.
 - Enriches websites for booking, ordering, conversion, and weak-site signals.

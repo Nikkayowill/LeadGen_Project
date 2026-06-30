@@ -23,7 +23,7 @@ export function LeadFinderSummary({ leads }: { leads: DiscoveredLead[] }) {
         detail={topLead ? `${topLead.leadScore}/100 · ${topLead.priorityLabel}` : "Try a broader search"}
       />
       {websiteGaps > 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:col-span-2 xl:col-span-4">
+        <div className="rounded-sm border border-amber-500/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 sm:col-span-2 xl:col-span-4">
           {websiteGaps} fresh lead{websiteGaps === 1 ? "" : "s"} have a clear website gap and no detected booking system.
         </div>
       ) : null}

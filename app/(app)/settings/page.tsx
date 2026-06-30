@@ -55,7 +55,7 @@ export default async function SettingsPage() {
             <CardContent className="space-y-3">
               {pricingTemplates.length ? (
                 pricingTemplates.map((template) => (
-                  <div key={template.id} className="rounded-lg border p-3">
+                  <div key={template.id} className="rounded-sm border border-border bg-background/40 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">{template.template_name}</p>
                       {template.is_default ? <Badge variant="success">Default</Badge> : null}
@@ -81,7 +81,7 @@ export default async function SettingsPage() {
             <CardContent className="space-y-3">
               {pitchTemplates.length ? (
                 pitchTemplates.map((template) => (
-                  <div key={template.id} className="rounded-lg border p-3">
+                  <div key={template.id} className="rounded-sm border border-border bg-background/40 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">{template.template_name}</p>
                       {template.industry ? <Badge variant="secondary">{template.industry}</Badge> : null}

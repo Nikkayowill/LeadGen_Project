@@ -19,7 +19,7 @@ export function LeadSearchForm({
   };
 
   return (
-    <form className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_0.65fr_0.65fr_0.8fr_0.85fr_0.8fr_0.7fr_auto]">
+    <form className="grid gap-3 rounded-sm border border-border bg-card p-4 md:grid-cols-2 xl:grid-cols-[1.15fr_1fr_0.65fr_0.65fr_0.8fr_0.85fr_0.8fr_0.7fr_auto]">
       <div className="space-y-2">
         <Label htmlFor="query">Business type</Label>
         <Input

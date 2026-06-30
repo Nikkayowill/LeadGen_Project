@@ -234,16 +234,25 @@ function stripHtml(value: string) {
 }
 
 async function fetchWebsiteText(websiteUrl: string) {
+  for (const url of getWebsiteFetchUrls(websiteUrl)) {
+    const html = await fetchSingleWebsiteText(url);
+    if (html) return html;
+  }
+
+  return null;
+}
+
+async function fetchSingleWebsiteText(websiteUrl: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4500);
     const response = await fetch(websiteUrl, {
       signal: controller.signal,
       headers: {
         "user-agent": "LeadFinderBot/0.1 (+local sales pipeline research)"
       }
     });
-    clearTimeout(timeout);
 
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "";
@@ -251,5 +260,15 @@ async function fetchWebsiteText(websiteUrl: string) {
     return (await response.text()).slice(0, 300_000);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+function getWebsiteFetchUrls(websiteUrl: string) {
+  const urls = [websiteUrl];
+  if (websiteUrl.startsWith("https://")) {
+    urls.push(websiteUrl.replace(/^https:\/\//, "http://"));
+  }
+  return urls;
 }

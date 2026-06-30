@@ -5,15 +5,11 @@ import { LeadTable } from "@/components/leads/lead-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getLeads } from "@/services/leads";
+import { getFollowUpLeads } from "@/services/leads";
 
 export default async function FollowUpsPage() {
   try {
-    const leads = await getLeads();
-    const today = new Date().toISOString().slice(0, 10);
-    const due = leads.filter(
-      (lead) => lead.next_follow_up && lead.next_follow_up <= today && lead.lead_status !== "Won" && lead.lead_status !== "Lost"
-    );
+    const due = await getFollowUpLeads();
 
     return (
       <div className="space-y-6">

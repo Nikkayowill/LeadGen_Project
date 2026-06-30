@@ -10,8 +10,8 @@ import { formatCurrency } from "@/lib/utils";
 import { getDashboardStats } from "@/services/dashboard";
 
 const statCards = [
-  { key: "totalLeads", title: "Total leads", helper: "Businesses in pipeline", icon: ListChecks },
-  { key: "followUpsDue", title: "Due today", helper: "Calls and messages waiting", icon: CalendarClock },
+  { key: "totalLeads", title: "Mapped leads", helper: "Businesses in your route", icon: ListChecks },
+  { key: "followUpsDue", title: "Due today", helper: "Timely next touches", icon: CalendarClock },
   { key: "demosBooked", title: "Demos booked", helper: "Warm website conversations", icon: MonitorPlay },
   { key: "wonDeals", title: "Won deals", helper: "Closed website projects", icon: Trophy }
 ] as const;
@@ -20,12 +20,12 @@ export default async function DashboardPage() {
   try {
     const stats = await getDashboardStats();
     return (
-      <div className="space-y-7">
-        <section className="overflow-hidden rounded-3xl border border-white/10 bg-card p-6 shadow-[0_18px_44px_rgba(2,8,23,0.22)] sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1.5fr_0.9fr] lg:items-end">
+      <div className="space-y-6">
+        <section className="overflow-hidden rounded-sm border border-border bg-card p-5 shadow-[0_1px_0_rgba(15,23,42,0.04)] sm:p-7">
+          <div className="grid gap-6 lg:grid-cols-[1.45fr_0.9fr] lg:items-end">
             <PageHeader
-              title="Sales dashboard"
-              description="Track local business leads, follow-ups, demos, and website opportunities from one workspace."
+              title="Route your next website deal"
+              description="Scoutline helps you spot local businesses with website gaps, keep follow-ups moving, and turn prospects into booked conversations."
               actions={
                 <Button asChild>
                   <Link href="/leads/new">
@@ -35,13 +35,13 @@ export default async function DashboardPage() {
                 </Button>
               }
             />
-            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/70">Pipeline value</p>
-              <p className="mt-3 text-4xl font-semibold tracking-tight text-white">
+            <div className="rounded-sm border border-primary/25 bg-primary/[0.06] p-5 shadow-[inset_3px_0_0_hsl(var(--primary))]">
+              <p className="text-[11px] font-semibold uppercase tracking-normal text-primary">Pipeline value</p>
+              <p className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
                 {formatCurrency(stats.potentialRevenue)}
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Estimated active website revenue using one-time build fees plus first-year monthly support.
+                Estimated active website revenue from build fees plus first-year monthly support.
               </p>
             </div>
           </div>
@@ -55,9 +55,9 @@ export default async function DashboardPage() {
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                   <div>
                     <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-                    <p className="mt-1 text-xs text-sky-200/55">{card.helper}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{card.helper}</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-sky-200">
+                  <div className="rounded-sm border border-border bg-secondary p-2 text-primary">
                     <Icon className="h-4 w-4" aria-hidden="true" />
                   </div>
                 </CardHeader>
@@ -67,19 +67,19 @@ export default async function DashboardPage() {
               </Card>
             );
           })}
-          <Card className="border-sky-300/20 bg-sky-400/[0.06]">
+          <Card className="border-accent/30 bg-accent/[0.06] shadow-[inset_3px_0_0_hsl(var(--accent))]">
             <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
               <div>
-                <CardTitle className="text-sm font-medium text-sky-100">Revenue forecast</CardTitle>
-                <p className="mt-1 text-xs text-sky-200/65">Active pipeline value</p>
+                <CardTitle className="text-sm font-medium text-foreground">Revenue forecast</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Active pipeline value</p>
               </div>
-              <div className="rounded-xl border border-sky-200/20 bg-sky-300/10 p-2 text-sky-100">
+              <div className="rounded-sm border border-accent/30 bg-accent/15 p-2 text-accent">
                 <DollarSign className="h-4 w-4" aria-hidden="true" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-semibold tracking-tight">{formatCurrency(stats.potentialRevenue)}</div>
-              <p className="mt-1 text-xs text-sky-100/70">One-time plus first-year monthly fees</p>
+              <p className="mt-1 text-xs text-muted-foreground">One-time plus first-year monthly fees</p>
             </CardContent>
           </Card>
         </div>

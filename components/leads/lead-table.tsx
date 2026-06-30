@@ -10,10 +10,10 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import type { Lead } from "@/lib/types/database";
+import type { LeadTableLead } from "@/services/leads";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
-export function LeadTable({ leads }: { leads: Lead[] }) {
+export function LeadTable({ leads }: { leads: LeadTableLead[] }) {
   return (
     <Table>
       <TableHeader>

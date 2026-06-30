@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
-  BarChart3,
   CalendarClock,
+  Compass,
   FileText,
   LayoutDashboard,
   ListChecks,
@@ -10,6 +10,7 @@ import {
   Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -24,34 +25,37 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-transparent">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-background/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
-          <Link href="/dashboard" className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-400/10 text-sky-200">
-                <BarChart3 className="h-5 w-5" aria-hidden="true" />
+      <header className="sticky top-0 z-40 border-b border-border bg-background/88 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+          <Link href="/dashboard" className="min-w-0" aria-label="Scoutline dashboard">
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 place-items-center rounded-sm border border-primary/25 bg-foreground text-background shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]">
+                <Compass className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold tracking-wide text-foreground">SiteScout</p>
-                <p className="truncate text-xs text-sky-200/70">Local website sales pipeline</p>
+                <p className="truncate text-sm font-semibold uppercase tracking-normal text-foreground">Scoutline</p>
+                <p className="truncate text-xs font-medium text-muted-foreground">Local prospect command</p>
               </div>
             </div>
           </Link>
-          <Button asChild size="sm">
-            <Link href="/leads/new">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              New lead
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button asChild size="sm">
+              <Link href="/leads/new">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                New lead
+              </Link>
+            </Button>
+          </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-4">
+        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto border-t border-border/70 px-4 py-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-3 text-sm text-muted-foreground transition hover:border-white/10 hover:bg-white/5 hover:text-foreground"
+                className="inline-flex min-h-9 items-center gap-2 rounded-sm border border-transparent px-3 text-sm font-medium text-muted-foreground transition hover:border-border hover:bg-secondary/75 hover:text-foreground"
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="whitespace-nowrap">{item.label}</span>
@@ -60,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-10">{children}</main>
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-8">{children}</main>
     </div>
   );
 }

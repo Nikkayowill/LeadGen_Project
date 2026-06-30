@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { discoveredLeadToInsert, type DiscoveredLead, type LeadFinderSearch } from "@/lib/types/discovery";
 import { findExistingLeadForDiscovery } from "@/services/discovery/existing-leads";
@@ -26,8 +26,11 @@ export async function saveDiscoveredLeadAction(formData: FormData) {
 
   const lead = await createLead(discoveredLeadToInsert(discoveredLead));
 
+  revalidateTag("leads");
   revalidatePath("/leads");
   revalidatePath("/dashboard");
+  revalidatePath("/follow-ups");
+  revalidatePath("/pitch-generator");
   redirect(`/leads/${lead.id}`);
 }
 
@@ -40,6 +43,7 @@ export async function saveDiscoveryRunAction(formData: FormData) {
   const leads = JSON.parse(rawLeads) as DiscoveredLead[];
   const run = await createDiscoveryRun(search, leads);
 
+  revalidateTag("discovery-runs");
   revalidatePath("/lead-finder");
   redirect(`/lead-finder/runs/${run.id}`);
 }
@@ -49,8 +53,12 @@ export async function promoteDiscoveredLeadAction(formData: FormData) {
   if (!discoveredLeadId) return;
 
   const leadId = await promoteDiscoveredLead(discoveredLeadId);
+  revalidateTag("leads");
+  revalidateTag("discovery-runs");
   revalidatePath("/lead-finder");
   revalidatePath("/leads");
   revalidatePath("/dashboard");
+  revalidatePath("/follow-ups");
+  revalidatePath("/pitch-generator");
   redirect(`/leads/${leadId}`);
 }

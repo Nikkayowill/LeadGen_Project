@@ -63,7 +63,7 @@ export function StagedDiscoveredLeadsTable({ leads }: { leads: DiscoveredLeadRow
             </TableCell>
             <TableCell>
               <div className="space-y-2">
-                <WebsiteStatusBadge status={lead.has_website ? "Unknown" : websiteStatusLabel(lead.source)} />
+                <WebsiteStatusBadge status={websiteStatusLabel(lead)} />
                 <Badge variant={gapVariant(lead.website_gap)}>{lead.website_gap.replaceAll("_", " ")}</Badge>
                 <Badge variant={websiteQualityVariant(lead.website_quality)}>
                   {lead.website_quality.replace("_", " ")}
@@ -155,6 +155,9 @@ function websiteQualityVariant(quality: string) {
   return "success";
 }
 
-function websiteStatusLabel(source: string) {
-  return source === "osm_overpass" ? "Not listed" : "No Website";
+function websiteStatusLabel(lead: DiscoveredLeadRow) {
+  if (lead.has_website) return "Unknown";
+  if (lead.website_gap === "provider_no_website") return "No Website";
+  if (lead.website_gap === "not_listed") return "Not listed";
+  return "Unknown";
 }

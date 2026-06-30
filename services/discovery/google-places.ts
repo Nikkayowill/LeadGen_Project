@@ -1,4 +1,6 @@
 import type { DiscoveryCandidate, LeadFinderSearch } from "@/lib/types/discovery";
+import { getDiscoveryRejection } from "@/services/discovery/gatekeeper";
+import { geocodeLocation, type Coordinates } from "@/services/discovery/geocoding";
 import { guardPaidProviderUsage, recordPaidProviderUsage } from "@/services/discovery/provider-limits";
 
 type GooglePlace = {
@@ -25,10 +27,11 @@ export async function searchGooglePlaces(
 ): Promise<DiscoveryCandidate[]> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) return [];
-  const searchQueries = buildSearchQueries(input);
+  const coordinates = await geocodeLocation(input.location);
+  const searchQueries = buildSearchQueries(input, coordinates);
   const results: DiscoveryCandidate[] = [];
 
-  for (const textQuery of searchQueries) {
+  for (const searchQuery of searchQueries) {
     const usage = await guardPaidProviderUsage("google_places", input);
     const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
@@ -38,11 +41,7 @@ export async function searchGooglePlaces(
         "x-goog-fieldmask":
           "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.types,places.businessStatus,places.googleMapsUri,places.rating,places.userRatingCount"
       },
-      body: JSON.stringify({
-        textQuery,
-        maxResultCount: usage.maxResults,
-        includePureServiceAreaBusinesses: true
-      }),
+      body: JSON.stringify(buildRequestBody(searchQuery, input, usage.maxResults)),
       cache: "no-store"
     });
 
@@ -53,6 +52,7 @@ export async function searchGooglePlaces(
 
     const batchResults = (payload.places ?? [])
       .filter((place) => place.businessStatus !== "CLOSED_PERMANENTLY")
+      .filter((place) => !place.websiteUri)
       .filter((place) => passesDemandFilters(place, input))
       .map((place): DiscoveryCandidate => ({
         source: "google_places",
@@ -71,25 +71,73 @@ export async function searchGooglePlaces(
           businessStatus: place.businessStatus ?? null,
           rating: place.rating ?? null,
           reviewCount: place.userRatingCount ?? null,
-          matchedQuery: textQuery
+          matchedQuery: searchQuery.textQuery,
+          locationBiased: Boolean(searchQuery.coordinates),
+          searchLocation: coordinates?.label ?? input.location
         }
-      }));
+      }))
+      .filter((lead) => !getDiscoveryRejection(lead));
 
     results.push(...batchResults);
-    await recordPaidProviderUsage("google_places", input, batchResults.length, { matchedQuery: textQuery });
+    await recordPaidProviderUsage("google_places", input, batchResults.length, {
+      matchedQuery: searchQuery.textQuery,
+      locationBiased: Boolean(searchQuery.coordinates)
+    });
   }
 
   return results;
 }
 
-function buildSearchQueries(input: LeadFinderSearch) {
+function buildSearchQueries(input: LeadFinderSearch, coordinates: Coordinates | null) {
   const normalized = normalizeWhitespace(input.query);
   const variants = [normalized, ...getNicheVariants(normalized)];
   const depthCount = input.searchDepth === "deep" ? 6 : input.searchDepth === "standard" ? 3 : 1;
 
   return [...new Set(variants)]
     .slice(0, depthCount)
-    .map((variant) => `${variant} in ${input.location}`);
+    .map((variant) => ({
+      textQuery: coordinates ? variant : `${variant} in ${input.location}`,
+      coordinates
+    }));
+}
+
+function buildRequestBody(
+  searchQuery: { textQuery: string; coordinates: Coordinates | null },
+  input: LeadFinderSearch,
+  resultLimit: number
+) {
+  const body: {
+    textQuery: string;
+    pageSize: number;
+    includePureServiceAreaBusinesses: boolean;
+    locationBias?: {
+      circle: {
+        center: {
+          latitude: number;
+          longitude: number;
+        };
+        radius: number;
+      };
+    };
+  } = {
+    textQuery: searchQuery.textQuery,
+    pageSize: resultLimit,
+    includePureServiceAreaBusinesses: true
+  };
+
+  if (searchQuery.coordinates) {
+    body.locationBias = {
+      circle: {
+        center: {
+          latitude: searchQuery.coordinates.lat,
+          longitude: searchQuery.coordinates.lon
+        },
+        radius: Math.min(Math.max(Math.round(input.radiusMiles * 1609.34), 1000), 50000)
+      }
+    };
+  }
+
+  return body;
 }
 
 function getNicheVariants(query: string) {

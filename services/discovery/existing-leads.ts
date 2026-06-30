@@ -8,6 +8,7 @@ type ExistingLead = {
   source: string | null;
   source_place_id: string | null;
   location: string | null;
+  website_url: string | null;
 };
 
 export async function markExistingLeads<T extends DiscoveryCandidate | DiscoveredLead>(
@@ -35,7 +36,7 @@ async function getExistingLeads() {
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("leads")
-      .select("id,business_name,phone,source,source_place_id,location");
+      .select("id,business_name,phone,source,source_place_id,location,website_url");
 
     if (error) return [];
     return data ?? [];
@@ -58,10 +59,16 @@ function isExistingMatch(lead: DiscoveryCandidate | DiscoveredLead, existing: Ex
     return true;
   }
 
+  const leadHost = lead.websiteUrl ? normalizeHost(lead.websiteUrl) : "";
+  const existingHost = existing.website_url ? normalizeHost(existing.website_url) : "";
+  if (leadHost && existingHost && leadHost === existingHost) {
+    return true;
+  }
+
   return (
     normalizeName(lead.businessName) === normalizeName(existing.business_name) &&
     Boolean(lead.location && existing.location) &&
-    normalizeName(lead.location ?? "") === normalizeName(existing.location ?? "")
+    locationsOverlap(lead.location ?? "", existing.location ?? "")
   );
 }
 
@@ -70,5 +77,30 @@ function normalizePhone(value: string) {
 }
 
 function normalizeName(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return value
+    .toLowerCase()
+    .replace(/\b(inc|llc|ltd|limited|corp|corporation|co|company)\b/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeHost(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function locationsOverlap(a: string, b: string) {
+  const aTokens = getLocationTokens(a);
+  const bTokens = getLocationTokens(b);
+  return aTokens.some((token) => bTokens.includes(token));
+}
+
+function getLocationTokens(value: string) {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 4);
 }

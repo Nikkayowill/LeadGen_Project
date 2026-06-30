@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select } from "@/components/ui/select";
 import { generatePitchMessages } from "@/lib/pitch";
-import { getLeads } from "@/services/leads";
+import { getPitchLeads } from "@/services/leads";
 
 type PitchPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -18,7 +18,7 @@ export default async function PitchGeneratorPage({ searchParams }: PitchPageProp
   const selectedLeadId = typeof params.leadId === "string" ? params.leadId : "";
 
   try {
-    const leads = await getLeads();
+    const leads = await getPitchLeads();
     const selectedLead = leads.find((lead) => lead.id === selectedLeadId) ?? leads[0];
     const messages = selectedLead ? generatePitchMessages(selectedLead) : null;
 
